@@ -19,5 +19,7 @@ This plugin communicates with Google Chat via the internet. It sends only the co
 ## Usage
 
 1. **Mark Your Tasks**: Within your Obsidian notes, mark any task with the specified format.
+   <img width="598" alt="image" src="https://github.com/anil-e/obsidian_gchat_plugin/assets/81299222/fe2d9235-60ca-4f83-a348-061c505147ac">
 2. **Set Webhook**: Input the webhook URL in the plugin settings.
+   <img width="820" alt="image" src="https://github.com/anil-e/obsidian_gchat_plugin/assets/81299222/0f53e222-1adb-4320-be1d-a33ce5792f4e">
 3. **Receive Notifications**: Once a task reaches its due date and time, you'll receive a notification in Google Chat.
