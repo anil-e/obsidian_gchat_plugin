@@ -1,8 +1,13 @@
-import { App, Plugin, PluginSettingTab, Setting, requestUrl } from "obsidian";
-
-interface GChatReminderSettings {
-	webhookUrl: string;
-}
+import {
+	App,
+	CachedMetadata,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	TFile,
+	requestUrl,
+} from "obsidian";
+import { GChatReminderSettings, Task } from "types";
 
 const DEFAULT_SETTINGS: GChatReminderSettings = {
 	webhookUrl: "",
@@ -11,6 +16,7 @@ const DEFAULT_SETTINGS: GChatReminderSettings = {
 export default class GChatReminder extends Plugin {
 	settings: GChatReminderSettings;
 	notifiedTasks: Set<string> = new Set();
+	taskCache: Set<Task> = new Set();
 
 	async onload() {
 		await this.loadSettings();
@@ -18,12 +24,75 @@ export default class GChatReminder extends Plugin {
 
 		this.addSettingTab(new Settingstab(this.app, this));
 
-		this.registerInterval(
-			setInterval(
-				this.checkAllFilesForTasks.bind(this),
-				3 * 60 * 1000
-			) as any
+		this.registerEvent(
+			this.app.metadataCache.on(
+				"changed",
+				this.handleFileChange.bind(this)
+			)
 		);
+
+		this.registerInterval(
+			setInterval(this.checkTasks.bind(this), 3 * 60 * 1000) as any
+		);
+
+		this.initializeTaskCache();
+	}
+
+	async initializeTaskCache() {
+		this.taskCache = new Set();
+		const files = this.app.vault.getMarkdownFiles();
+		for (const file of files) {
+			this.addToTaskCache(file);
+		}
+	}
+
+	handleFileChange(file: TFile, _data: string, _cache: CachedMetadata) {
+		this.addToTaskCache(file);
+	}
+
+	async addToTaskCache(file: TFile) {
+		if (file.extension !== "md") return;
+
+		const fileContent = await this.app.vault.read(file);
+		const tasks = this.extractTasks(fileContent);
+		tasks.forEach((task) => this.taskCache.add(task));
+	}
+
+	checkTasks() {
+		this.taskCache.forEach((task) => {
+			const { content, dueDateTime } = task;
+			this.checkTask(content, dueDateTime);
+		});
+	}
+
+	extractTasks(content: string) {
+		const regex = /(.*?)(\(gChat@(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\))/g;
+		let match;
+		const tasks = [];
+
+		while ((match = regex.exec(content)) !== null) {
+			let reminderText = match[1].trim();
+
+			if (reminderText.startsWith("- [ ]")) {
+				reminderText = reminderText.replace("- [ ]", "").trim();
+			}
+
+			const dueDateTime = new Date(match[3]);
+			tasks.push({ content: reminderText, dueDateTime });
+		}
+
+		return tasks;
+	}
+
+	checkTask(content: string, dueDateTime: Date) {
+		const now = new Date();
+		const taskId = `${content}-${dueDateTime.toISOString()}`;
+
+		if (dueDateTime <= now && !this.notifiedTasks.has(taskId)) {
+			this.notifiedTasks.add(taskId);
+			this.saveNotifiedTasks();
+			this.sendNotification(content, dueDateTime.toISOString());
+		}
 	}
 
 	async loadSettings() {
@@ -47,36 +116,6 @@ export default class GChatReminder extends Plugin {
 
 	async saveNotifiedTasks() {
 		await this.saveData({ notifiedTasks: [...this.notifiedTasks] });
-	}
-
-	async checkAllFilesForTasks() {
-		const files = this.app.vault.getMarkdownFiles();
-		for (const file of files) {
-			const fileContent = await this.app.vault.read(file);
-			this.checkContentForTasks(fileContent);
-		}
-	}
-
-	checkContentForTasks(content: string) {
-		const regex = /(.*?)(\(gChat@(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\))/g;
-		let match;
-		while ((match = regex.exec(content)) !== null) {
-			let reminderText = match[1].trim();
-
-			if (reminderText.startsWith("- [ ]")) {
-				reminderText = reminderText.replace("- [ ]", "").trim();
-			}
-
-			const dueDateTime = new Date(match[3]);
-			const now = new Date();
-			const taskId = `${reminderText}-${match[3]}`;
-
-			if (dueDateTime <= now && !this.notifiedTasks.has(taskId)) {
-				this.notifiedTasks.add(taskId);
-				this.saveNotifiedTasks();
-				this.sendNotification(reminderText, match[3]);
-			}
-		}
 	}
 
 	async sendNotification(reminderText: string, dateTime: string) {
