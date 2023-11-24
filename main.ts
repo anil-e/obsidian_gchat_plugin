@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { App, Plugin, PluginSettingTab, Setting, requestUrl } from "obsidian";
 
 interface GChatReminderSettings {
 	webhookUrl: string;
@@ -8,7 +8,7 @@ const DEFAULT_SETTINGS: GChatReminderSettings = {
 	webhookUrl: "",
 };
 
-export default class MyPlugin extends Plugin {
+export default class GChatReminder extends Plugin {
 	settings: GChatReminderSettings;
 	notifiedTasks: Set<string> = new Set();
 
@@ -122,22 +122,17 @@ export default class MyPlugin extends Plugin {
 		};
 
 		try {
-			const response = await fetch(
-				`${webhookUrl}&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD`,
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify(payload),
-				}
-			);
+			const response = await requestUrl({
+				method: "POST",
+				url: `${webhookUrl}&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD`,
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(payload),
+			});
 
-			if (!response.ok) {
-				console.error(
-					"Error sending Google Chat Notifcation:",
-					response.statusText
-				);
+			if (response.status != 200) {
+				console.error("Error sending Google Chat Notifcation:");
 			}
 		} catch (error) {
 			console.error("Error sending Google Chat Notifcation:", error);
@@ -146,9 +141,9 @@ export default class MyPlugin extends Plugin {
 }
 
 class Settingstab extends PluginSettingTab {
-	plugin: MyPlugin;
+	plugin: GChatReminder;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: GChatReminder) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
