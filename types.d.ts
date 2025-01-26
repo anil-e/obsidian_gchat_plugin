@@ -1,5 +1,6 @@
 export interface GChatReminderSettings {
 	webhookUrl: string;
+	notifiedTasks: string[];
 }
 
 export interface Task {

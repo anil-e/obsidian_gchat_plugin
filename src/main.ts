@@ -11,6 +11,7 @@ import { GChatReminderSettings, Task } from "types";
 
 const DEFAULT_SETTINGS: GChatReminderSettings = {
 	webhookUrl: "",
+	notifiedTasks: [],
 };
 
 export default class GChatReminder extends Plugin {
@@ -20,7 +21,6 @@ export default class GChatReminder extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
-		await this.loadNotifiedTasks();
 
 		this.addSettingTab(new Settingstab(this.app, this));
 
@@ -84,38 +84,26 @@ export default class GChatReminder extends Plugin {
 		return tasks;
 	}
 
-	checkTask(content: string, dueDateTime: Date) {
+	async checkTask(content: string, dueDateTime: Date) {
 		const now = new Date();
 		const taskId = `${content}-${dueDateTime.toISOString()}`;
 
 		if (dueDateTime <= now && !this.notifiedTasks.has(taskId)) {
 			this.notifiedTasks.add(taskId);
-			this.saveNotifiedTasks();
+			this.saveSettings();
 			this.sendNotification(content, dueDateTime.toISOString());
 		}
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			await this.loadData()
-		);
+		const loadedData = await this.loadData();
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
+		this.notifiedTasks = new Set(this.settings.notifiedTasks ?? []);
 	}
 
 	async saveSettings() {
+		this.settings.notifiedTasks = [...this.notifiedTasks];
 		await this.saveData(this.settings);
-	}
-
-	async loadNotifiedTasks() {
-		const savedTasks = await this.loadData();
-		if (savedTasks && savedTasks.notifiedTasks) {
-			this.notifiedTasks = new Set(savedTasks.notifiedTasks);
-		}
-	}
-
-	async saveNotifiedTasks() {
-		await this.saveData({ notifiedTasks: [...this.notifiedTasks] });
 	}
 
 	async sendNotification(reminderText: string, dateTime: string) {
