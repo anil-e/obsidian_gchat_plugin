@@ -1,7 +1,7 @@
 {
 	"id": "ghcat-reminder",
 	"name": "GChat Reminder",
-	"version": "1.0.3",
+	"version": "1.0.6",
 	"minAppVersion": "0.15.0",
 	"description": "Sends notifications to Google Chat Webhook based on due dates in Obsidian tasks.",
 	"author": "Anil Erdogan",
